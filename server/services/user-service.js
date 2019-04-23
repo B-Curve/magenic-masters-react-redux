@@ -7,7 +7,7 @@ class UserService {
 	findByEmailAndPassword(email, password) {
 		return new Observable(observer => {
 			User.findOne({
-				email: { $regex: new RegExp(email, 'i') }
+				email: email.toLowerCase(),
 			}, (err, user) => {
 				if (err) return observer.error(err);
 				if (!user) {
@@ -17,9 +17,41 @@ class UserService {
 				}
 
 				this.isPasswordValid(password, user).subscribe({
-					next: () => observer.next({ ...user.toObject(), password: undefined }),
+					next: () => observer.next({ ...user.toObject(), salt: undefined, hash: undefined }),
 					error: e => observer.error(e),
 					complete: () => observer.complete(),
+				});
+			});
+		});
+	}
+
+	createUser(user, password) {
+		return new Observable(observer => {
+			User.findOne({
+				email: user.email.toLowerCase(),
+			}, (err, u) => {
+				if (u !== null) {
+					return observer.error({
+						message: `User with email ${user.email} already exists.`,
+					});
+				}
+
+				user.email = user.email.toLowerCase();
+
+				User.create(user).then((result) => {
+					result.updatePassword(password).then(() => {
+						observer.next();
+						observer.complete();
+					}).catch(() => {
+						User.deleteOne({ email: email.toLowerCase() });
+						observer.error({
+							message: 'Failed to create user.',
+						});
+					});
+				}).catch(err => {
+					return observer.error({
+						message: 'Failed to create user.',
+					});
 				});
 			});
 		});
@@ -33,7 +65,7 @@ class UserService {
 				});
 			}
 
-			hasher.comparePassword(plainText, user.password)
+			hasher.comparePassword(plainText, user.hash)
 				.then(response => {
 					if (!!response) {
 						observer.next();

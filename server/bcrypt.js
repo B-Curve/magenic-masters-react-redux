@@ -1,5 +1,5 @@
 const bcrypt = require('bcrypt');
-const saltRounds = 16;
+const saltRounds = 8;
 
 const genSalt = function() {
 	return new Promise((resolve, reject) => {
